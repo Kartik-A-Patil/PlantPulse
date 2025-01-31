@@ -11,7 +11,7 @@ interface PlantMoodProps {
 }
 
 const getStatusColor = (value: number, type: string) => {
-  const ranges = {
+  const ranges:any = {
     moisture: { low: 30, high: 70 },
     temperature: { low: 18, high: 28 },
     gas: { low: 400, high: 1000 },

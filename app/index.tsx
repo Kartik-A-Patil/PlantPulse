@@ -1,34 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  Droplet, Thermometer, CloudRain, Sun, Smile, Frown, Meh,
-  TrendingUp, ChevronDown, ChevronUp
-} from 'lucide-react-native';
-import { PlantData, MetricCardProps } from './types/types';
-import { COLORS ,chartConfig} from './utils/constant';
-import { collectDataSamples } from './utils/randomDataGenerator';
-import  PlantMood  from './components/PlantMood';
-import { MetricCard } from './components/graph';
-import {createTable,fetchData} from './services/dbService';
-const PlantMonitoringScreen: React.FC = () => {
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, ScrollView, StyleSheet, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Droplet, Thermometer, CloudRain, Sun } from "lucide-react-native";
+import { PlantData, MetricCardProps } from "./types/types";
+import { COLORS } from "./utils/constant";
+import { collectDataSamples } from "./utils/randomDataGenerator";
+import PlantMood from "./components/PlantMood";
+import { MetricCard } from "./components/graph";
+import { setupDatabase, insertData, fetchAllData } from "./services/dbService";
+import analyzePlantHealth from "./utils/Gemini";
+// Number of samples to collect before averaging (5 minutes = 300 seconds = 60 samples at 5-second intervals)
+const SAMPLES_BEFORE_AVERAGE = 180; // 15 minutes (180 samples at 5-second intervals)
+const HISTORICAL_ENTRIES_LIMIT = 32; // Store last 8 hours (32 x 15-min intervals)
+const index: React.FC = () => {
   const [currentData, setCurrentData] = useState<PlantData | null>(null);
   const [historicalData, setHistoricalData] = useState<PlantData[]>([]);
+  const tempDataStorage = useRef<PlantData[]>([]);
+
+  const calculateAverage = (samples: PlantData[]): PlantData => {
+    const sum = samples.reduce(
+      (acc, curr) => ({
+        soilMoisture: acc.soilMoisture + curr.soilMoisture,
+        temperature: acc.temperature + curr.temperature,
+        humidity: acc.humidity + curr.humidity,
+        lightIntensity: acc.lightIntensity + curr.lightIntensity,
+        gasLevels: acc.gasLevels + curr.gasLevels,
+      }),
+      {
+        soilMoisture: 0,
+        temperature: 0,
+        humidity: 0,
+        lightIntensity: 0,
+        gasLevels: 0,
+      }
+    );
+
+    const count = samples.length;
+    return {
+      soilMoisture: parseFloat((sum.soilMoisture / count).toFixed(2)),
+      temperature: parseFloat((sum.temperature / count).toFixed(2)),
+      humidity: parseFloat((sum.humidity / count).toFixed(2)),
+      lightIntensity: parseFloat((sum.lightIntensity / count).toFixed(2)),
+      gasLevels: parseFloat((sum.gasLevels / count).toFixed(2)),
+    };
+  };
 
   useEffect(() => {
     const fetchData = async () => {
-      const newData = await collectDataSamples();
-      const dbData = await fetchData();
-      setCurrentData(newData);
-      setHistoricalData(prev => [...prev, newData].slice(-20));
+      if (tempDataStorage.current.length >= SAMPLES_BEFORE_AVERAGE) {
+        const averageData = calculateAverage(tempDataStorage.current);
+
+        try {
+          const db = await setupDatabase(); // Get the database instance
+          await insertData(db, {
+            // Pass the instance to insertData
+            moisture: averageData.soilMoisture,
+            gas: averageData.gasLevels,
+            temperature: averageData.temperature,
+            humidity: averageData.humidity,
+            light: averageData.lightIntensity,
+          });
+
+          const data = await fetchAllData(db); // Pass the instance to fetchAllData
+          const mappedData = data.map((row) => ({
+            soilMoisture: row.moisture,
+            temperature: row.temperature,
+            humidity: row.humidity,
+            lightIntensity: row.light,
+            gasLevels: row.gas,
+          }));
+          setHistoricalData(mappedData.slice(-HISTORICAL_ENTRIES_LIMIT));
+        } catch (error) {
+          console.error("Error storing data:", error);
+        }
+
+        tempDataStorage.current = [];
+      }
+
+      // Update fetchAllData in dbService.ts to include ordering:
+
+      const collectData = async () => {
+        const newData = await collectDataSamples();
+        setCurrentData(newData);
+
+        tempDataStorage.current.push(newData);
+
+        if (tempDataStorage.current.length >= SAMPLES_BEFORE_AVERAGE) {
+          const averageData = calculateAverage(tempDataStorage.current);
+
+          try {
+            await insertData(setupDatabase, {
+              moisture: averageData.soilMoisture,
+              temperature: averageData.temperature,
+              humidity: averageData.humidity,
+              light: averageData.lightIntensity,
+              gas: averageData.gasLevels,
+            });
+            console.log("Stored 15-min average data");
+
+            const data = await fetchAllData(setupDatabase);
+            setHistoricalData(data.slice(-HISTORICAL_ENTRIES_LIMIT));
+          } catch (error) {
+            console.error("Error storing data:", error);
+          }
+
+          tempDataStorage.current = [];
+        }
+      };
+
+      const dataInterval = setInterval(collectData, 5000);
+      return () => clearInterval(dataInterval);
     };
+    // In the useEffect's collectData function:
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
   }, []);
 
-  
-  if (!currentData || !historicalData.length) {
+  if (!currentData) {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={{ color: COLORS.onSurface }}>Loading...</Text>
@@ -38,47 +125,59 @@ const PlantMonitoringScreen: React.FC = () => {
 
   const metrics = [
     {
-      id: 'moisture',
-      title: 'Soil Moisture',
+      id: "moisture",
+      title: "Soil Moisture",
       value: `${currentData.soilMoisture}%`,
       icon: <Droplet color={COLORS.moisture} size={24} />,
       color: COLORS.moisture,
-      data: historicalData.map(d => d.soilMoisture),
-      unit: '%',
+      data:
+        historicalData && historicalData.length > 0
+          ? historicalData.map((d) => d.soilMoisture)
+          : [],
+      unit: "%",
     },
     {
-      id: 'temperature',
-      title: 'Temperature',
+      id: "temperature",
+      title: "Temperature",
       value: `${currentData.temperature}°C`,
       icon: <Thermometer color={COLORS.temperature} size={24} />,
       color: COLORS.temperature,
-      data: historicalData.map(d => d.temperature),
-      unit: '°C',
+      data:
+        historicalData && historicalData.length > 0
+          ? historicalData.map((d) => d.temperature)
+          : [],
+      unit: "°C",
     },
     {
-      id: 'humidity',
-      title: 'Humidity',
+      id: "humidity",
+      title: "Humidity",
       value: `${currentData.humidity}%`,
       icon: <CloudRain color={COLORS.humidity} size={24} />,
       color: COLORS.humidity,
-      data: historicalData.map(d => d.humidity),
-      unit: '%',
+      data:
+        historicalData && historicalData.length > 0
+          ? historicalData.map((d) => d.humidity)
+          : [],
+      unit: "%",
     },
     {
-      id: 'light',
-      title: 'Light Intensity',
+      id: "light",
+      title: "Light Intensity",
       value: `${currentData.lightIntensity} lux`,
       icon: <Sun color={COLORS.light} size={24} />,
       color: COLORS.light,
-      data: historicalData.map(d => d.lightIntensity),
-      unit: ' lux',
+      data:
+        historicalData && historicalData.length > 0
+          ? historicalData.map((d) => d.lightIntensity)
+          : [],
+      unit: " lux",
     },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <PlantMood 
+        <PlantMood
           moisture={currentData.soilMoisture}
           gas={currentData.gasLevels}
           temperature={currentData.temperature}
@@ -107,121 +206,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    margin: 16,
-    padding: 24,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  statusIconContainer: {
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  statusText: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  trendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    backgroundColor: `${COLORS.primary}10`,
-    padding: 12,
-    borderRadius: 12,
-  },
-  trendText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  overviewCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    margin: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  metricCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 24,
-    margin: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  metricHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metricHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconContainer: {
-    padding: 12,
-    borderRadius: 12,
-  },
-  metricHeaderText: {
-    marginLeft: 12,
-  },
-  metricTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.7,
-  },
-  metricValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  chartWrapper: {
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
-export default PlantMonitoringScreen;
+export default index;

@@ -50,10 +50,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             propsForLabels: {
               fontSize: 12,
             },
-            // Reduce left padding to minimize empty space
-            paddingLeft: 10,
-            // Adjust right padding if needed
-            paddingRight: 20,
+            
           }}
           bezier
           style={{
