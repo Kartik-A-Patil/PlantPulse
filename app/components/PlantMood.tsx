@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 interface PlantMoodProps {
@@ -8,14 +8,18 @@ interface PlantMoodProps {
   temperature: number;
   humidity: number;
   light: number;
+  AIResult?: {
+    suggestions?: string[];
+    current_plant_condition?: "Good" | "Average" | "Poor";
+  };
 }
 
 const getStatusColor = (value: number, type: string) => {
-  const ranges:any = {
+  const ranges: any = {
     moisture: { low: 30, high: 70 },
     temperature: { low: 18, high: 28 },
     gas: { low: 400, high: 1000 },
-    light: { low: 500, high: 2000 },
+    light: 1 | 0,
     humidity: { low: 40, high: 60 },
   };
 
@@ -32,39 +36,22 @@ const PlantMood: React.FC<PlantMoodProps> = ({
   temperature,
   humidity,
   light,
+  AIResult,
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Plant Environment</Text>
       <View style={styles.metricsContainer}>
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
             <Feather name="droplet" size={20} color={COLORS.textSecondary} />
-
-            <Text
-              style={[
-                styles.value,
-                { color: getStatusColor(moisture, "moisture") },
-              ]}
-            >
+            <Text style={[styles.value, { color: getStatusColor(moisture, "moisture") }]}>
               {moisture}
               <Text style={styles.unit}> %</Text>
             </Text>
           </View>
-
           <View style={styles.metricItem}>
-            <Feather
-              name="thermometer"
-              size={20}
-              color={COLORS.textSecondary}
-            />
-
-            <Text
-              style={[
-                styles.value,
-                { color: getStatusColor(temperature, "temperature") },
-              ]}
-            >
+            <Feather name="thermometer" size={20} color={COLORS.textSecondary} />
+            <Text style={[styles.value, { color: getStatusColor(temperature, "temperature") }]}>
               {temperature}
               <Text style={styles.unit}> °C</Text>
             </Text>
@@ -74,19 +61,15 @@ const PlantMood: React.FC<PlantMoodProps> = ({
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
             <Feather name="wind" size={20} color={COLORS.textSecondary} />
-
             <Text style={[styles.value, { color: getStatusColor(gas, "gas") }]}>
               {gas}
               <Text style={styles.unit}> ppm</Text>
             </Text>
           </View>
-
           <View style={styles.metricItem}>
             <Feather name="sun" size={20} color={COLORS.textSecondary} />
-            <Text
-              style={[styles.value, { color: getStatusColor(light, "light") }]}
-            >
-              {light}
+            <Text style={[styles.value, { color: getStatusColor(light, "light") }]}>
+              {light ? 'Good' : 'Need Sunlight'}
               <Text style={styles.unit}> lux</Text>
             </Text>
           </View>
@@ -95,19 +78,29 @@ const PlantMood: React.FC<PlantMoodProps> = ({
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
             <Feather name="activity" size={20} color={COLORS.textSecondary} />
-
-            <Text
-              style={[
-                styles.value,
-                { color: getStatusColor(humidity, "humidity") },
-              ]}
-            >
+            <Text style={[styles.value, { color: getStatusColor(humidity, "humidity") }]}>
               {humidity}
               <Text style={styles.unit}> %</Text>
             </Text>
           </View>
         </View>
       </View>
+
+      {AIResult && (
+        <View style={styles.aiContainer}>
+          <Text style={styles.conditionText}>Condition: {AIResult.current_plant_condition || "Unknown"}</Text>
+          {AIResult.suggestions?.length ? (
+            <View style={styles.suggestionsContainer}>
+              <Text style={styles.suggestionsTitle}>Suggestions:</Text>
+              {AIResult.suggestions.slice(0, 2).map((suggestion, index) => (
+                <Text key={index} style={styles.suggestionText}>
+                  • {suggestion}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 };
@@ -135,12 +128,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 16,
-  },
   metricsContainer: {
     backgroundColor: COLORS.cardBackground,
     borderRadius: 12,
@@ -159,7 +146,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-
   value: {
     fontSize: 22,
     fontWeight: "700",
@@ -170,6 +156,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 5,
     color: COLORS.textSecondary,
+  },
+  aiContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 12,
+  },
+  conditionText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  suggestionsContainer: {
+    marginTop: 8,
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginLeft: 10,
   },
 });
 

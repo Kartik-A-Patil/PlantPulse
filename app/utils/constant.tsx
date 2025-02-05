@@ -31,3 +31,13 @@ export const chartConfig = {
     fill: COLORS.onSurface, // Ensures labels contrast well with dark surfaces
   },
 };
+
+// export const CONFIG = {
+//   SAMPLES_BEFORE_AVERAGE: 180,
+//   HISTORICAL_ENTRIES_LIMIT: 6,
+//   DATA_COLLECTION_INTERVAL: 5000,
+//   MQTT_TOPIC: {
+//     SENSORS: 'esp8266/sensors',
+//     CONTROL: 'esp8266/control'
+//   }
+// } as const;

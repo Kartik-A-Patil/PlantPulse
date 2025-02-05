@@ -1,7 +1,6 @@
-import * as SQLite from 'expo-sqlite';
-
+import * as SQLite from "expo-sqlite";
 const setupDatabase = async () => {
-  const db = await SQLite.openDatabaseAsync('SensorData.db');
+  const db = await SQLite.openDatabaseAsync("SensorData.db");
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS AverageData (
@@ -10,17 +9,18 @@ const setupDatabase = async () => {
       gas REAL DEFAULT 0.0,
       temperature REAL DEFAULT 0.0,
       humidity REAL DEFAULT 0.0,
-      light REAL DEFAULT 0.0,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  
-  console.log('Table created successfully');
+
+  console.log("Table created successfully");
   return db;
 };
 
 // **Insert Data**
 const insertData = async (db, data) => {
+  console.log("Inserting data:", data);
+
   try {
     const result = await db.runAsync(
       `INSERT INTO AverageData (moisture, gas, temperature, humidity, light)
@@ -29,12 +29,15 @@ const insertData = async (db, data) => {
       data.gas ?? 0.0,
       data.temperature ?? 0.0,
       data.humidity ?? 0.0,
-      data.light ?? 0.0
+      data.light ?? 0
     );
 
-    console.log('Data inserted successfully. Last insert ID:', result.lastInsertRowId);
+    console.log(
+      "Data inserted successfully. Last insert ID:",
+      result.lastInsertRowId
+    );
   } catch (error) {
-    console.error('Error inserting data:', error);
+    console.error("Error inserting data:", error);
   }
 };
 
@@ -48,7 +51,7 @@ const fetchData = async (db, hours) => {
 
     return rows;
   } catch (error) {
-    console.error('Error fetching data:', error);
+    console.error("Error fetching data:", error);
     return [];
   }
 };
@@ -59,7 +62,7 @@ const fetchFirstRow = async (db) => {
     const row = await db.getFirstAsync(`SELECT * FROM AverageData LIMIT 1`);
     return row;
   } catch (error) {
-    console.error('Error fetching first row:', error);
+    console.error("Error fetching first row:", error);
     return null;
   }
 };
@@ -68,13 +71,20 @@ const fetchFirstRow = async (db) => {
 const fetchAllData = async (db) => {
   try {
     const rows = await db.getAllAsync(
-      `SELECT * FROM AverageData ORDER BY timestamp DESC`
+      `SELECT * FROM AverageData`
     );
     return rows;
   } catch (error) {
-    console.error('Error fetching all data:', error);
+    console.error("Error fetching all data:", error);
     return [];
   }
 };
+// **Check and Add Mock Data if DB is Empty or Doesn't Have Minimum 6 Entries**
 
-export { setupDatabase, insertData, fetchData, fetchFirstRow, fetchAllData };
+export {
+  setupDatabase,
+  insertData,
+  fetchData,
+  fetchFirstRow,
+  fetchAllData,
+};
