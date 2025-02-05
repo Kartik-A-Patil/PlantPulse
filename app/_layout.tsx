@@ -1,7 +1,11 @@
 import { Stack } from "expo-router";
 import MoterControl from "./components/MoterControl";
 import { View, Image, Text } from "react-native"; // Fixed View import
+import { LogBox } from "react-native";
 
+if (!__DEV__) {
+  LogBox.ignoreAllLogs(false); // Enable logs in production
+}
 export default function RootLayout() {
   return (
     <Stack

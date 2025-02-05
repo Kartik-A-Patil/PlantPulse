@@ -23,13 +23,12 @@ const insertData = async (db, data) => {
 
   try {
     const result = await db.runAsync(
-      `INSERT INTO AverageData (moisture, gas, temperature, humidity, light)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO AverageData (moisture, gas, temperature, humidity)
+       VALUES (?, ?, ?, ?)`,
       data.moisture ?? 0.0,
       data.gas ?? 0.0,
       data.temperature ?? 0.0,
       data.humidity ?? 0.0,
-      data.light ?? 0
     );
 
     console.log(

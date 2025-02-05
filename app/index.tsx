@@ -7,6 +7,7 @@ import {
   StatusBar,
   TouchableOpacity,
   ToastAndroid,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Droplet, Thermometer, CloudRain, Sun } from "lucide-react-native";
@@ -24,7 +25,7 @@ import {
 import analyzePlantHealth from "./utils/Gemini";
 // import { router } from "expo-router";
 import MqttService from "./services/mqttService";
-
+import AntDesign from "@expo/vector-icons/AntDesign";
 // Number of samples to collect before averaging (15 minutes: 180 samples at 5-second intervals)
 const SAMPLES_BEFORE_AVERAGE = 180;
 // Limit to store only the latest 6 averaged entries (adjust based on your needs)
@@ -32,7 +33,7 @@ const HISTORICAL_ENTRIES_LIMIT = 6;
 
 const Index: React.FC = () => {
   const [useMqtt, setUseMqtt] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   const [currentData, setCurrentData] = useState<PlantData | null>({
     soilMoisture: 60,
     temperature: 20,
@@ -194,18 +195,27 @@ const Index: React.FC = () => {
   });
 
   const fetchGemni = async () => {
-    const db = await setupDatabase();
-    const data = await fetchFirstRow(db);
-    const sensorData = {
-      soilMoisture: data.moisture || currentData.soilMoisture, // in range 0-1000
-      gasValue: data.gas || currentData.gasLevels, // MQ-135 gas reading
-      temperature: data.temperature || currentData.temperature, // in Celsius
-      humidity: data.humidity || currentData.humidity, // in percentage
-      plantAge: "17 months", // age of the plant
-      plantName: "Snake Plant", // name of the plant
-    };
-    const result = await analyzePlantHealth(sensorData);
-    setResult(result);
+    try {
+      setLoading(true);
+      const db = await setupDatabase();
+      const data = await fetchFirstRow(db);
+      const sensorData = {
+        soilMoisture: data.moisture || currentData.soilMoisture, // in range 0-1000
+        gasValue: data.gas || currentData.gasLevels, // MQ-135 gas reading
+        temperature: data.temperature || currentData.temperature, // in Celsius
+        humidity: data.humidity || currentData.humidity, // in percentage
+        plantAge: "17 months", // age of the plant
+        plantName: "Snake Plant", // name of the plant
+      };
+      const result = await analyzePlantHealth(sensorData);
+
+      setResult(result);
+    } catch (error) {
+      console.log("Error fetching Gemini Response:", error);
+      setLoading(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -217,7 +227,7 @@ const Index: React.FC = () => {
     {
       id: "moisture",
       title: "Soil Moisture",
-      value: `${currentData.soilMoisture}%`,
+      value: `${currentData.soilMoisture}`,
       icon: <Droplet color={COLORS.moisture} size={24} />,
       color: COLORS.moisture,
       data:
@@ -258,9 +268,7 @@ const Index: React.FC = () => {
       icon: <Sun color={COLORS.light} size={24} />,
       color: COLORS.light,
       data:
-        historicalData.length > 0
-          ? historicalData.map((d) => d.gasLevels)
-          : [],
+        historicalData.length > 0 ? historicalData.map((d) => d.gasLevels) : [],
       unit: "ppm",
       AIResult: Result.interpretations.gas_Level,
     },
@@ -327,7 +335,19 @@ const Index: React.FC = () => {
             AIResult={metric.AIResult}
           />
         ))}
-        {/* The visible button has been removed in favor of the hidden tap on PlantMood */}
+        <View style={styles.ReloadContainer}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => fetchGemni()}
+            activeOpacity={0.7}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <AntDesign name="reload1" size={24} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -351,6 +371,23 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     width: "100%",
   },
+  button: {
+    backgroundColor: "#1E1E1E",
+    padding: 14,
+    borderRadius: 50,
+    elevation: 5, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ReloadContainer:{
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 20,
+  }
 });
 
 export default Index;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,34 +7,46 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
+  Animated,
 } from "react-native";
-import { Entypo, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Entypo, Ionicons } from "@expo/vector-icons";
 import MqttService from "../services/mqttService";
 import { insertData, setupDatabase } from "../services/dbService";
 import { collectDataSamples } from "../utils/randomDataGenerator";
-import { Stack } from "expo-router";
-import MoterControl from "../components/MoterControl";
+
 const MotorControl: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [currentCommand, setCurrentCommand] = useState<string | null>(null);
-  const [selectedMode, setSelectedMode] = useState<"manual" | "auto">("manual");
-  const [CurrentData, setCurrentData] = useState<any>(null);
-  const [demoMode, setDemoMode] = useState(false);
-  const [localState, setLocalState] = useState<{
-    isAutoMode: boolean;
-    isMotorRunning: boolean;
-  }>({ isAutoMode: false, isMotorRunning: false });
+  const [currentData, setCurrentData] = useState<any>(null);
+  const [isAutoMode, setIsAutoMode] = useState(false);
+  const [motorRunning, setMotorRunning] = useState(false);
+  // Animated value for button press effect
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  // Function to animate button when pressed
+  const animateButton = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // MQTT sensor callback
   useEffect(() => {
     MqttService.setMessageCallback((message) => {
       if (message.destinationName === "esp8266/sensors") {
         try {
           const data = JSON.parse(message.payloadString);
           setCurrentData(data);
-          setLocalState({
-            isAutoMode: data.isMotorAutoMode,
-            isMotorRunning: data.isMotorRunning,
-          });
+          // Note: We're managing motorRunning based on our own commands.
         } catch (err) {
           console.error("Error parsing sensor JSON:", err);
         }
@@ -42,48 +54,45 @@ const MotorControl: React.FC = () => {
     });
   }, []);
 
+  // Auto mode logic: when auto mode is enabled, check soil moisture from sensor data
+  useEffect(() => {
+    if (isAutoMode && currentData?.soilMoisture !== undefined) {
+      const moisture = currentData.soilMoisture;
+      // If moisture is high (>700) and motor is off, then turn it on
+      if (moisture > 700 && !motorRunning) {
+        sendControlCommand("MOTOR_ON");
+      }
+      // If moisture is low (<=500) and motor is on, then turn it off
+      else if (moisture <= 500 && motorRunning) {
+        sendControlCommand("MOTOR_OFF");
+      }
+    }
+  }, [isAutoMode, currentData, motorRunning]);
+
   const sendControlCommand = (command: string) => {
     setCurrentCommand(command);
     MqttService.publishMessage("esp8266/control", command);
-    if (command === "MOTOR_AUTO_ON")
-      setLocalState((prev) => ({ ...prev, isAutoMode: true }));
-    if (command === "MOTOR_AUTO_OFF")
-      setLocalState((prev) => ({ ...prev, isAutoMode: false }));
-    if (command === "MOTOR_ON")
-      setLocalState((prev) => ({ ...prev, isMotorRunning: true }));
-    if (command === "MOTOR_OFF")
-      setLocalState((prev) => ({ ...prev, isMotorRunning: false }));
+    if (command === "MOTOR_ON") {
+      setMotorRunning(true);
+    } else if (command === "MOTOR_OFF") {
+      setMotorRunning(false);
+    }
   };
 
-  const isAutoMode = localState.isAutoMode;
-  const isMotorRunning = localState.isMotorRunning;
+  // Manual control options with emojis
+  const manualControlOptions = [
+    {
+      label: "Turn Motor ON",
+      value: "MOTOR_ON",
+      disabled: isAutoMode || motorRunning,
+    },
+    {
+      label: "Turn Motor OFF",
+      value: "MOTOR_OFF",
+      disabled: isAutoMode || !motorRunning,
+    },
+  ];
 
-  const controlOptions = {
-    manual: [
-      {
-        label: "Motor ON",
-        value: "MOTOR_ON",
-        disabled: isAutoMode || isMotorRunning,
-      },
-      {
-        label: "Motor OFF",
-        value: "MOTOR_OFF",
-        disabled: isAutoMode || !isMotorRunning,
-      },
-    ],
-    auto: [
-      {
-        label: "Enable Auto Mode",
-        value: "MOTOR_AUTO_ON",
-        disabled: isAutoMode,
-      },
-      {
-        label: "Disable Auto Mode",
-        value: "MOTOR_AUTO_OFF",
-        disabled: !isAutoMode,
-      },
-    ],
-  };
   const insertSampleData = async () => {
     const db = await setupDatabase();
     for (let i = 0; i < 6; i++) {
@@ -92,22 +101,18 @@ const MotorControl: React.FC = () => {
         moisture: sample.soilMoisture,
         temperature: sample.temperature,
         humidity: sample.humidity,
-        light: sample.lightIntensity,
         gas: sample.gasLevels,
       });
     }
   };
+
   return (
     <View>
       <TouchableOpacity
         onPress={() => setModalVisible(true)}
         style={styles.iconButton}
       >
-        <Entypo
-          name="flow-branch"
-          size={28}
-          color="white"
-        />
+        <Entypo name="flow-branch" size={28} color="white" />
       </TouchableOpacity>
 
       <Modal
@@ -124,77 +129,61 @@ const MotorControl: React.FC = () => {
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Ionicons name="close-circle-outline" size={24} color="#666" />
+                <Ionicons name="close-circle-outline" size={32} color="#aaa" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modeSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.modeButton,
-                  selectedMode === "manual" && styles.selectedModeButton,
-                ]}
-                onPress={() => setSelectedMode("manual")}
-              >
-                <Text
-                  style={[
-                    styles.modeButtonText,
-                    selectedMode === "manual" && styles.selectedModeButtonText,
-                  ]}
-                >
-                  Manual Mode
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modeButton,
-                  selectedMode === "auto" && styles.selectedModeButton,
-                ]}
-                onPress={() => setSelectedMode("auto")}
-              >
-                <Text
-                  style={[
-                    styles.modeButtonText,
-                    selectedMode === "auto" && styles.selectedModeButtonText,
-                  ]}
-                >
-                  Auto Mode
-                </Text>
-              </TouchableOpacity>
+            {/* Auto mode toggle */}
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>Auto Mode </Text>
+              <Switch
+                value={isAutoMode}
+                onValueChange={setIsAutoMode}
+                thumbColor={isAutoMode ? "#0A84FF" : "#FFF"}
+                style={{ transform: [{ scaleX: 1.3 }, { scaleY: 1.2 }] }}
+              />
             </View>
 
             <View style={styles.controlContainer}>
-              {controlOptions[selectedMode].map((option) => (
-                <TouchableOpacity
+              {manualControlOptions.map((option) => (
+                <Animated.View
                   key={option.value}
-                  style={[
-                    styles.radioContainer,
-                    option.disabled && styles.disabledButton,
-                  ]}
-                  onPress={() => sendControlCommand(option.value)}
-                  disabled={option.disabled}
+                  style={{ transform: [{ scale: scaleAnim }] }}
                 >
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.radioLabel,
-                      option.disabled && styles.disabledText,
+                      styles.radioContainer,
+                      // Highlight the active button if the motor is running and it's the ON command
+                      motorRunning && option.value === "MOTOR_ON"
+                        ? styles.activeButton
+                        : {},
+                      option.disabled && styles.disabledButton,
                     ]}
+                    onPress={() => {
+                      animateButton();
+                      sendControlCommand(option.value);
+                    }}
+                    disabled={option.disabled}
                   >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.radioLabel,
+                        option.disabled && styles.disabledText,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
               ))}
             </View>
-            <View style={styles.toggleContainer}>
-              <Text style={styles.toggleLabel}>Demo Mode</Text>
-              <Switch value={demoMode} onValueChange={setDemoMode} />
-            </View>
+
             <TouchableOpacity
               style={styles.sampleDataButton}
               onPress={insertSampleData}
             >
               <Text style={styles.sampleDataButtonText}>
-                Insert Sample Data
+                Insert Sample Data (6 rows)
               </Text>
             </TouchableOpacity>
           </View>
@@ -224,32 +213,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  modalTitle: { fontSize: 24, fontWeight: "bold", color: "#FFF" },
-  closeButton: { padding: 5 },
-  modeSelector: {
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  closeButton: {
+    padding: 5,
+  },
+  toggleContainer: {
     flexDirection: "row",
-    backgroundColor: "#333",
-    borderRadius: 12,
-    padding: 4,
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
+  toggleLabel: {
+    fontSize: 18,
+    color: "#FFF",
   },
-  selectedModeButton: {
-    backgroundColor: "#444",
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
-  },
-  modeButtonText: { fontSize: 16, color: "#AAA", fontWeight: "500" },
-  selectedModeButtonText: { color: "#0A84FF", fontWeight: "600" },
   controlContainer: {
     backgroundColor: "#252525",
-    borderRadius: 12,
+    borderRadius: 30,
     padding: 15,
     marginBottom: 20,
   },
@@ -257,25 +241,40 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginVertical: 4,
     alignItems: "center",
+    backgroundColor: "#444",
+    borderRadius: 40,
   },
-  radioLabel: { fontSize: 16, color: "#FFF" },
-  disabledButton: { opacity: 0.5 },
-  disabledText: { color: "#777" },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+  radioLabel: {
+    fontSize: 16,
+    color: "#FFF",
   },
-  toggleLabel: { fontSize: 18, color: "#FFF" },
+  activeButton: {
+    backgroundColor: "#28a745", // Green for active motor
+  },
+  disabledButton: {
+    opacity: 0.5,
+    backgroundColor: "#333",
+  },
+  disabledText: {
+    color: "#DDD",
+  },
   sampleDataButton: {
-    backgroundColor: "#0A84FF",
+    backgroundColor: "#333",
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 16,
     alignItems: "center",
     marginBottom: 20,
+    elevation: 5, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  sampleDataButtonText: { color: "white", fontSize: 16, fontWeight: "500" },
+  sampleDataButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "500",
+  },
 });
 
 export default MotorControl;

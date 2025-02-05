@@ -11,7 +11,7 @@ export const generateRandomData = () => {
 
 // Data collection (mock)
 let previousData = {
-  soilMoisture: 50,
+  soilMoisture: 450,
   temperature: 25,
   humidity: 60,
   gasLevels: 150,
@@ -26,10 +26,10 @@ export const collectDataSamples = async () => {
   };
 
   const newData = {
-    soilMoisture: generateVariation(previousData.soilMoisture, -5, 5),
+    soilMoisture: generateVariation(previousData.soilMoisture, -20, 20),
     temperature: generateVariation(previousData.temperature, -1, 1),
     humidity: generateVariation(previousData.humidity, -3, 3),
-    gasLevels: generateVariation(previousData.gasLevels, -10, 10),
+    gasLevels: generateVariation(previousData.gasLevels, -20, 20),
     lightIntensity: Math.random() < 0.5 ? 0 : 1, // Randomly choose between 1 or 0
     timestamp: new Date(),
   };

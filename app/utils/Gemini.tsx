@@ -3,12 +3,11 @@ const {
   HarmCategory,
   HarmBlockThreshold,
 } = require("@google/generative-ai");
-
-const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+import Constants from "expo-constants";
+const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
-
 const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-pro",
+  model: "gemini-1.5-flash",
 });
 
 const generationConfig = {
@@ -54,9 +53,6 @@ async function analyzePlantHealth(sensorData) {
     // Send the message to Gemini
     const result = await chatSession.sendMessage(inputMessage);
 
-    // Parse and log the response
-    console.log("Gemini Response:", result.response.text());
-
     return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Error with Gemini analysis:", error);
@@ -66,11 +62,11 @@ async function analyzePlantHealth(sensorData) {
 
 // Example usage with sensor data
 const sensorData = {
-  soilMoisture: 600,       // in range 0-1000
-  gasValue: 200,          // MQ-135 gas reading
-  temperature: 25,        // in Celsius
-  humidity: 40,           // in percentage
-  plantAge: "2 years",    // age of the plant
+  soilMoisture: 600, // in range 0-1000
+  gasValue: 200, // MQ-135 gas reading
+  temperature: 25, // in Celsius
+  humidity: 40, // in percentage
+  plantAge: "2 years", // age of the plant
   plantName: "Snake Plant", // name of the plant
 };
 

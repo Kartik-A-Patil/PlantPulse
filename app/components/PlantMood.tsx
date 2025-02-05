@@ -16,10 +16,9 @@ interface PlantMoodProps {
 
 const getStatusColor = (value: number, type: string) => {
   const ranges: any = {
-    moisture: { low: 30, high: 70 },
+    moisture: { low: 370, high: 600 },
     temperature: { low: 18, high: 28 },
     gas: { low: 400, high: 1000 },
-    light: 1 | 0,
     humidity: { low: 40, high: 60 },
   };
 
@@ -44,14 +43,28 @@ const PlantMood: React.FC<PlantMoodProps> = ({
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
             <Feather name="droplet" size={20} color={COLORS.textSecondary} />
-            <Text style={[styles.value, { color: getStatusColor(moisture, "moisture") }]}>
+            <Text
+              style={[
+                styles.value,
+                { color: getStatusColor(moisture, "moisture") },
+              ]}
+            >
               {moisture}
-              <Text style={styles.unit}> %</Text>
+              <Text style={styles.unit}></Text>
             </Text>
           </View>
           <View style={styles.metricItem}>
-            <Feather name="thermometer" size={20} color={COLORS.textSecondary} />
-            <Text style={[styles.value, { color: getStatusColor(temperature, "temperature") }]}>
+            <Feather
+              name="thermometer"
+              size={20}
+              color={COLORS.textSecondary}
+            />
+            <Text
+              style={[
+                styles.value,
+                { color: getStatusColor(temperature, "temperature") },
+              ]}
+            >
               {temperature}
               <Text style={styles.unit}> °C</Text>
             </Text>
@@ -68,9 +81,14 @@ const PlantMood: React.FC<PlantMoodProps> = ({
           </View>
           <View style={styles.metricItem}>
             <Feather name="sun" size={20} color={COLORS.textSecondary} />
-            <Text style={[styles.value, { color: getStatusColor(light, "light") }]}>
-              {light ? 'Good' : 'Need Sunlight'}
-              <Text style={styles.unit}> lux</Text>
+            <Text
+              style={[
+                styles.value,
+                { color: light ? COLORS.warning : COLORS.success },
+              ]}
+            >
+              {light ? "Bright" : "Dim"}
+              <Text style={styles.unit}></Text>
             </Text>
           </View>
         </View>
@@ -78,7 +96,12 @@ const PlantMood: React.FC<PlantMoodProps> = ({
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
             <Feather name="activity" size={20} color={COLORS.textSecondary} />
-            <Text style={[styles.value, { color: getStatusColor(humidity, "humidity") }]}>
+            <Text
+              style={[
+                styles.value,
+                { color: getStatusColor(humidity, "humidity") },
+              ]}
+            >
               {humidity}
               <Text style={styles.unit}> %</Text>
             </Text>
@@ -88,7 +111,9 @@ const PlantMood: React.FC<PlantMoodProps> = ({
 
       {AIResult && (
         <View style={styles.aiContainer}>
-          <Text style={styles.conditionText}>Condition: {AIResult.current_plant_condition || "Unknown"}</Text>
+          <Text style={styles.conditionText}>
+            Condition: {AIResult.current_plant_condition || "Unknown"}
+          </Text>
           {AIResult.suggestions?.length ? (
             <View style={styles.suggestionsContainer}>
               <Text style={styles.suggestionsTitle}>Suggestions:</Text>
