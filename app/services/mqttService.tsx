@@ -1,7 +1,6 @@
 // MqttService.ts
 import init from "react_native_mqtt";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 // Declare Paho as any if types are not available. Replace with proper import if available.
 declare var Paho: any;
 
@@ -17,7 +16,7 @@ init({
 
 // MQTT connection options for HiveMQ Cloud via secure WebSocket
 // const host: string = Constants.expoConfig.extra.HIVE_HOST || "";
-const host: string = process.env.HIVE_HOST || "";
+const host: string = process.env.EXPO_PUBLIC_HIVE_HOST || "";
 const port: number = 8884;
 const clientId: string =
   "ReactNativeClient_" + Math.floor(Math.random() * 1000);

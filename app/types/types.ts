@@ -17,4 +17,17 @@ interface PlantData {
     unit: string;
     AIResult:any
   }
-  export type { PlantData, MetricCardProps };
+  interface PlantMoodProps {
+    moisture: number;
+    gas: number;
+    temperature: number;
+    humidity: number;
+    light: number | undefined | boolean;
+    AIResult?: {
+      suggestions?: string[];
+      current_plant_condition?: "Good" | "Average" | "Poor";
+      interpretations?: any;
+    };
+  }
+  export type { PlantData, MetricCardProps,PlantMoodProps };
+

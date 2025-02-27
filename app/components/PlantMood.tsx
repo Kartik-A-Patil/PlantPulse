@@ -1,18 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { PlantMoodProps } from "@/app/types/types";
 
-interface PlantMoodProps {
-  moisture: number;
-  gas: number;
-  temperature: number;
-  humidity: number;
-  light: number;
-  AIResult?: {
-    suggestions?: string[];
-    current_plant_condition?: "Good" | "Average" | "Poor";
-  };
-}
 
 const getStatusColor = (value: number, type: string) => {
   const ranges: any = {

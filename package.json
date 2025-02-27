@@ -58,7 +58,9 @@
     "react-native-webview": "13.12.5",
     "sp-react-native-mqtt": "^0.5.1",
     "victory-native": "^41.14.0",
-    "@react-native-picker/picker": "2.9.0"
+    "@react-native-picker/picker": "2.9.0",
+    "expo-camera": "~16.0.16",
+    "expo-file-system": "~18.0.10"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
